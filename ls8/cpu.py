@@ -2,6 +2,15 @@
 
 import sys
 
+# setup constants for op codes
+LDI = 0b10000010
+PRN = 0b01000111
+HLT = 0b00000001
+MUL = 0b10100010
+POP = 0b01000110
+PUSH = 0b01000101
+SP = 7  # stack pointer set to be used a R7 per spec
+
 
 class CPU:
     """Main CPU class."""
@@ -23,25 +32,6 @@ class CPU:
 
     def load(self, file_name):
         """Load a program into memory."""
-
-        # address = 0
-
-        # # For now, we've just hardcoded a program:
-
-        # program = [
-        #     # From print8.ls8
-        #     0b10000010,  # LDI R0,8
-        #     0b00000000,
-        #     0b00001000,
-        #     0b01000111,  # PRN R0
-        #     0b00000000,
-        #     0b00000001,  # HLT
-        # ]
-
-        # for instruction in program:
-        #     self.ram[address] = instruction
-        #     address += 1
-
         try:
             address = 0
             # open the file
@@ -71,9 +61,11 @@ class CPU:
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         elif op == "SUB":
-            pass
+            self.reg[reg_a] -= self.reg[reg_b]
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "DIV":
+            self.reg[reg_a] /= self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -100,17 +92,11 @@ class CPU:
     def run(self, file_name):
         """Run the CPU."""
 
-        # setup vars for simple op codes
-        LDI = 0b10000010
-        PRN = 0b01000111
-        HLT = 0b00000001
-        MUL = 0b10100010
-
         # load the program into memory
         self.load(file_name)
-
         # var to type less out in the while loop
         read_ram = self.ram_read
+        write_ram = self.write_ram
 
         # run the program
         while True:
@@ -128,7 +114,6 @@ class CPU:
                 self.pc += 2
             elif op == MUL:
                 # access 2 ergisters and multiply them
-
                 # grab the ram values, that hold the register index's we need
                 reg_a = read_ram(pc + 1)
                 reg_b = read_ram(pc + 2)
@@ -136,6 +121,28 @@ class CPU:
                 self.alu("MUL", reg_a, reg_b)
                 # move program counter
                 self.pc += 3
+            elif op == PUSH:
+                # decrement SP
+                self.reg[SP] -= 1
+                # get current mem address SP points to
+                stack_addr = self.reg[SP]
+                # grab a reg number from the instruction
+                reg_num = read_ram(pc + 1)
+                # get the value out of the register
+                val = self.reg[reg_num]
+                # write the reg value to a postition in the stack
+                write_ram(stack_addr, val)
+                self.pc += 2
+            elif op == POP:
+                # get the value out of memory
+                stack_val = read_ram(self.reg[SP])
+                # get the register number from the instruction in memory
+                reg_num = read_ram(pc + 1)
+                # set the value of a register to the value held in the stack
+                self.reg[reg_num] = stack_val
+                # increment the SP
+                self.reg[SP] += 1
+                self.pc += 2
             elif op == HLT:
                 sys.exit(1)
             else:
@@ -147,6 +154,8 @@ if len(sys.argv) == 2:
     file_name = sys.argv[1]
 
     c = CPU()
+    # set the mem address the stack pointer is looking at.
+    c.reg[SP] = 0xf4
     c.run(file_name)
 else:
     # err message
