@@ -7,8 +7,12 @@ LDI = 0b10000010
 PRN = 0b01000111
 HLT = 0b00000001
 MUL = 0b10100010
+ADD = 0b10100000
 POP = 0b01000110
+RET = 0b00010001
 PUSH = 0b01000101
+CALL = 0b01010000
+
 SP = 7  # stack pointer set to be used a R7 per spec
 
 
@@ -121,6 +125,13 @@ class CPU:
                 self.alu("MUL", reg_a, reg_b)
                 # move program counter
                 self.pc += 3
+            elif op == ADD:
+                # access 2 registers and add them
+                reg_a = read_ram(pc + 1)
+                reg_b = read_ram(pc + 2)
+                # call the ALU
+                self.alu("ADD", reg_a, reg_b)
+                self.pc += 3
             elif op == PUSH:
                 # decrement SP
                 self.reg[SP] -= 1
@@ -143,6 +154,23 @@ class CPU:
                 # increment the SP
                 self.reg[SP] += 1
                 self.pc += 2
+            elif op == CALL:
+                # decrement the SP
+                self.reg[SP] -= 1
+                # get the current mem addr that SP points to
+                stack_addr = self.reg[SP]
+                # get the return mem addr
+                return_addr = pc + 2
+                # push the return addr onto the stack
+                write_ram(stack_addr, return_addr)
+                # set PC to the value in the register
+                reg_num = read_ram(pc + 1)
+                self.pc = self.reg[reg_num]
+            elif op == RET:
+                # pop the return mem addr off the stack
+                # store the poped mem addr in the PC
+                self.pc = read_ram(self.reg[SP])
+                self.reg[SP] += 1
             elif op == HLT:
                 sys.exit(1)
             else:
@@ -164,3 +192,10 @@ ERR: PLEASE PROVIDE A FILE THAT YOU WISH TO RUN\n
 ex python cpu.py examples/FILE_NAME
 """)
     sys.exit(2)
+
+# file_name = "examples/call.ls8"
+
+# c = CPU()
+# # set the mem address the stack pointer is looking at.
+# c.reg[SP] = 0xf4
+# c.run(file_name)
